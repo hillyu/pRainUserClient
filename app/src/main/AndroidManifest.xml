@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.bluetooth.pMon"
+    android:versionCode="1"
+    android:versionName="1.0" >
+
+    <uses-sdk
+        android:minSdkVersion="18"
+        android:targetSdkVersion="18" />
+
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="false" />
+
+    <!--<android:uses-permission-->
+        <!--android:name="android.permission.WRITE_EXTERNAL_STORAGE"-->
+        <!--android:maxSdkVersion="18" />-->
+    <!--<android:uses-permission android:name="android.permission.READ_PHONE_STATE" />-->
+    <!--<android:uses-permission-->
+        <!--android:name="android.permission.READ_EXTERNAL_STORAGE"-->
+        <!--android:maxSdkVersion="18" />-->
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:logo="@drawable/ic_launcher"
+        android:theme="@style/AppTheme" >
+        <activity
+            android:name=".ScanningActivity"
+            android:label="@string/app_name"
+            android:screenOrientation="portrait" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".PeripheralActivity"
+            android:label="@string/title_activity_peripheral"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustPan" >
+        </activity>
+        <activity
+            android:name=".PmonActivity"
+            android:label="@string/title_activity_hrdemo"
+            android:parentActivityName=".ScanningActivity"
+            android:screenOrientation="portrait" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="org.bluetooth.pMon.ScanningActivity" />
+        </activity>
+        <service
+            android:name=".pMonService"
+            android:enabled="true"
+          >
+        </service>
+    </application>
+
+</manifest>
