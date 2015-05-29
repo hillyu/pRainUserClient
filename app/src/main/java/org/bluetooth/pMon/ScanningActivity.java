@@ -83,7 +83,7 @@ public class ScanningActivity extends ListActivity {
         //TODO: add alert when device are not found.
     }
 
-    ;
+
 
     @Override
     protected void onPause() {
