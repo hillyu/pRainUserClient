@@ -79,7 +79,7 @@ public class PmonActivity extends Activity {
 
         // Show the Up button in the action bar.
         getActionBar().setDisplayHomeAsUpEnabled(true);
-        setTitle("Heart Rate Demo");
+        setTitle("pMon Multi-Sensor");
 //        mConsole = (EditText) findViewById(R.id.hr_console_item);
         mTextView = (TextView) findViewById(R.id.hr_text_view);
 
