@@ -45,6 +45,16 @@ public class PmonActivity extends Activity {
     private EditText mConsole = null;
     private TextView mTextView = null;
     private ListView listview = null;
+    private TextView angle1 = null;
+    private TextView angle2 = null;
+    private TextView angle3 = null;
+    private TextView batt1;
+    private TextView batt2;
+    private TextView batt3;
+    private TextView status1;
+    private TextView status2;
+    private TextView status3;
+
 
     private pMonService mPmonService;
     private pMonSensorItemAdapter mListAdapter;
@@ -53,12 +63,25 @@ public class PmonActivity extends Activity {
     public static final String SENSOR2 = "pMon2";
     public static final String SENSOR3 = "pMon3";
 
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pmon);
 //        listview = (ListView) findViewById(R.id.listView);
 //        mListAdapter = new pMonSensorItemAdapter(this);
+         angle1 = (TextView) findViewById(R.id.angle1);
+         angle2 = (TextView) findViewById(R.id.angle2);
+         angle3 = (TextView) findViewById(R.id.angle3);
+
+         batt1 = (TextView) findViewById(R.id.batt1);
+         batt2 = (TextView) findViewById(R.id.batt2);
+         batt3 = (TextView) findViewById(R.id.batt3);
+
+         status1 = (TextView) findViewById(R.id.status1);
+         status2 = (TextView) findViewById(R.id.status2);
+         status3 = (TextView) findViewById(R.id.status3);
 
         Button adjustButton = (Button) findViewById(R.id.button);
 
@@ -116,7 +139,7 @@ public class PmonActivity extends Activity {
     protected void onResume() {
         super.onResume();
         log("Resuming activity");
-        listview.setAdapter(mListAdapter);
+//        listview.setAdapter(mListAdapter);
         registerReceiver(mPmonReceiver,mIntentFilter());
 
 
@@ -182,7 +205,7 @@ public class PmonActivity extends Activity {
     private void processData(String deviceName, String deviceAddress, String characteristic, byte[] data) {
         Log.d(TAG, "Received data from:" + characteristic + data.toString() + deviceAddress + "@" + deviceName);
         if (!initialVec.containsKey(deviceAddress)){
-            double[] vec = {0,0,1};
+            double[] vec = {0,-1,0};
             initialVec.put(deviceAddress,vec);
             currentVec.put(deviceAddress,vec);
         }
@@ -234,6 +257,29 @@ public class PmonActivity extends Activity {
             //TODO: display BMP readings to UI
 
         }
+        if (characteristic.equals(BleDefinedUUIDs.Characteristic.BATTERY_LEVEL.toString())) {
+            //TODO: display BMP readings to UI
+            int battery =0;
+            if (data != null && data.length > 0) {
+                final ByteBuffer bb = ByteBuffer.allocate(20);
+                bb.order(ByteOrder.LITTLE_ENDIAN);
+                bb.put(data);
+                bb.rewind();
+                battery = (bb.getShort() & 0xffff);
+            }
+            switch(deviceName){
+                case SENSOR1:
+                    batt1.setText("Battery Level: " + battery + "%");
+                    break;
+                case SENSOR2:
+                    batt2.setText("Battery Level: " + battery + "%");
+                    break;
+                case SENSOR3:
+                    batt3.setText("Battery Level: " + battery + "%");
+                    break;
+                default:break;
+            }
+        }
     }
 
     // Handles various events fired by the Service that has been bound to.
@@ -256,10 +302,42 @@ public class PmonActivity extends Activity {
                     processData(deviceName, deviceAddress, characteristic, data);
                     break;
                 case pMonService.ACTION_GATT_CONNECTED:
+                    deviceName = intent.getStringExtra(pMonService.EXTRAS_DEVICE_NAME);
+                    deviceAddress = intent.getStringExtra(pMonService.EXTRAS_DEVICE_ADDRESS);
+                    switch (deviceName){
+                        case SENSOR1:
+                            status1.setText(R.string.online);
+                            break;
+                        case SENSOR2:
+                            status2.setText(R.string.online);
+                            break;
+                        case SENSOR3:
+                            status3.setText(R.string.online);
+                            break;
+                        default:
+                            break;
+
+
+                    }
                     //TODO: set connection status in UI
                     break;
                 case pMonService.ACTION_GATT_DISCONNECTED:
                     //TODO: set disconnected status in UI, also may trigger alert to user to reconnect.
+                    deviceName = intent.getStringExtra(pMonService.EXTRAS_DEVICE_NAME);
+                    deviceAddress = intent.getStringExtra(pMonService.EXTRAS_DEVICE_ADDRESS);
+                    switch (deviceName) {
+                        case SENSOR1:
+                            status1.setText(R.string.offline);
+                            break;
+                        case SENSOR2:
+                            status2.setText(R.string.offline);
+                            break;
+                        case SENSOR3:
+                            status3.setText(R.string.offline);
+                            break;
+                        default:
+                            break;
+                    }
                     break;
                 case pMonService.ACTION_GATT_SERVICES_DISCOVERED:
                     //not quite useful but include for forward compatibility
@@ -318,6 +396,16 @@ public class PmonActivity extends Activity {
     public void updateSensorDataOnUI(String deviceName, String angle){
         switch (deviceName){
             case SENSOR1:
+                angle1.setText(angle);
+                break;
+            case SENSOR2:
+                angle2.setText(angle);
+                break;
+            case SENSOR3:
+                angle3.setText(angle);
+                break;
+            default:
+                break;
 
         }
     }

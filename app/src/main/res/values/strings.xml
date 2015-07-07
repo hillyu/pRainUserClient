@@ -6,5 +6,7 @@
     <string name="hello_world">Hello world!</string>
     <string name="title_activity_peripheral">Peripheral</string>
     <string name="title_activity_hrdemo">Device Scan</string>
+    <string name="online">Status: Online</string>
+    <string name="offline">Status: Offline</string>
 
 </resources>

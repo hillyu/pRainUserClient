@@ -33,6 +33,7 @@ import java.util.UUID;
 public class pMonService extends Service {
     private static final String TAG = "pMonService"; //degug tag;
     private static final int DATA_RATE_TIMEOUT = 200;
+    private static final short BATTERY_QUERY_TIMEOUT = 3000;
 
     private Handler mHandler = null;
     private final IBinder mBinder = new LocalBinder();
@@ -48,8 +49,10 @@ public class pMonService extends Service {
     private boolean isInitialized = false;
     // UUDI od Heart Rate service:
     final static private UUID pMon_Services = BleDefinedUUIDs.Service.PMON_SERVICES;
+    final static private UUID dev_info = BleDefinedUUIDs.Service.DEVICE_INFO;
     final static private UUID pMon_MPU6050_Characteristic = BleDefinedUUIDs.Characteristic.PMON_MPU6050;
     final static private UUID pMon_BMP_Characteristic = BleDefinedUUIDs.Characteristic.PMON_BMP;
+    final static private UUID pMon_BAT_Characteristic = BleDefinedUUIDs.Characteristic.BATTERY_LEVEL;
     //String Constant
     public static final String EXTRAS_DEVICE_NAME = PeripheralActivity.EXTRAS_DEVICE_NAME;
     public static final String EXTRAS_DEVICE_ADDRESS = PeripheralActivity.EXTRAS_DEVICE_ADDRESS;
@@ -245,8 +248,12 @@ public class pMonService extends Service {
         }
     }
 //  generic boradcast method.
-    private void broadcastUpdate(final String action) {
+    private void broadcastUpdate(BluetoothGatt gatt, final String action) {
         final Intent intent = new Intent(action);
+        final String address = gatt.getDevice().getAddress();
+        String deviceName = gatt.getDevice().getName();
+        intent.putExtra(EXTRAS_DEVICE_NAME, deviceName);
+        intent.putExtra(EXTRAS_DEVICE_ADDRESS,address);
         sendBroadcast(intent);
     }
 
@@ -333,11 +340,11 @@ public class pMonService extends Service {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.d(TAG, "Device connected" + gatt.getDevice().getAddress());
                 //broadcast the connected status to client
-                broadcastUpdate(ACTION_GATT_CONNECTED);
+                broadcastUpdate(gatt,ACTION_GATT_CONNECTED);
                 gatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.d(TAG, "Device disconnected" + gatt.getDevice().getAddress());
-                broadcastUpdate(ACTION_GATT_DISCONNECTED);
+                broadcastUpdate(gatt, ACTION_GATT_DISCONNECTED);
             }
         }
 
@@ -346,10 +353,14 @@ public class pMonService extends Service {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.d(TAG, "Services discovered");
                 //let the client know via action broadcast;
-                broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
+                broadcastUpdate(gatt, ACTION_GATT_SERVICES_DISCOVERED);
                 BluetoothGattService tmpService = gatt.getService(pMon_Services);
                 final BluetoothGattCharacteristic mpu6050 = tmpService.getCharacteristic(pMon_MPU6050_Characteristic);
                 final BluetoothGattCharacteristic bmp = tmpService.getCharacteristic(pMon_BMP_Characteristic);
+                //battery service and characteristic
+                BluetoothGattService battService = gatt.getService(dev_info);
+                final BluetoothGattCharacteristic battlevel = battService.getCharacteristic(pMon_BAT_Characteristic);
+                
 
 
                 Runnable mpuTO = new Runnable() {
@@ -365,9 +376,17 @@ public class pMonService extends Service {
                         gatt.readCharacteristic(bmp);
                     }
                 };
-                mHandler.postDelayed(mpuTO, 1000);
 
-                mHandler.postDelayed(bmpTO, 1000); //0.5 seconds
+                Runnable batTO = new Runnable() {
+                    @Override
+                    public void run() {
+                        gatt.readCharacteristic(battlevel);
+                    }
+                };
+                mHandler.postDelayed(batTO, 1000); //0.5 seconds
+                mHandler.postDelayed(mpuTO, 2000);
+//                mHandler.postDelayed(bmpTO, 3000); //0.5 seconds //Fixme: Disabled BMP for now.
+
 
             } else {
                 Log.d(TAG, "Unable to discover services");
@@ -392,7 +411,7 @@ public class pMonService extends Service {
                                          int status) {
 
             handleSensorData(gatt, characteristic);
-
+            Log.d(TAG, characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0).toString());
             //request after delay fro another read:
             Runnable timeout = new Runnable() {
                 @Override
@@ -400,6 +419,9 @@ public class pMonService extends Service {
                     gatt.readCharacteristic(characteristic);
                 }
             };
+            if(characteristic.getUuid().equals(pMon_BAT_Characteristic)){
+                mHandler.postDelayed(timeout, BATTERY_QUERY_TIMEOUT);
+            }else
             mHandler.postDelayed(timeout, DATA_RATE_TIMEOUT); //10 seconds
         }
 
