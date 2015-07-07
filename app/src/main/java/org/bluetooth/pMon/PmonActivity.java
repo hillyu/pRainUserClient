@@ -49,13 +49,16 @@ public class PmonActivity extends Activity {
     private pMonService mPmonService;
     private pMonSensorItemAdapter mListAdapter;
     private double sensitivity = 0.15f;
+    public static final String SENSOR1 = "pMon1";
+    public static final String SENSOR2 = "pMon2";
+    public static final String SENSOR3 = "pMon3";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pmon);
-        listview = (ListView) findViewById(R.id.listView);
-        mListAdapter = new pMonSensorItemAdapter(this);
+//        listview = (ListView) findViewById(R.id.listView);
+//        mListAdapter = new pMonSensorItemAdapter(this);
 
         Button adjustButton = (Button) findViewById(R.id.button);
 
@@ -220,8 +223,10 @@ public class PmonActivity extends Activity {
                 //get the angle between rv  and cv;
                 double angle = getAngle(initialVec.get(deviceAddress), cv);
 
-                int position = mListAdapter.addAngle(deviceName, deviceAddress, (float) angle);
-                updateListView(position, String.format("%.0f", angle) + "°");
+                updateSensorDataOnUI(deviceName, String.format("%.0f", angle) + "°");
+
+//                int position = mListAdapter.addAngle(deviceName, deviceAddress, (float) angle);
+//                updateListView(position, String.format("%.0f", angle) + "°");
 //            Log.d(TAG,"received mpudata!");
             }
         }
@@ -289,27 +294,33 @@ public class PmonActivity extends Activity {
     }
 //update listview;
 
-    public boolean updateListView(int position, String angle) {
-        int first = listview.getFirstVisiblePosition();
-        int last = listview.getLastVisiblePosition();
-        if(position < first || position > last) {
-            //just update your DataSet
-            //the next time getView is called
-            //the ui is updated automatically
-            return false;
-        }
-        else {
-            View convertView = listview.getChildAt(position - first);
-            //this is the convertView that you previously returned in getView
-            //just fix it (for example:)
-//            seakBar bar = (SeakBar) convertView.findViewById(R.id.progress);
-            TextView mTextView = (TextView) convertView.findViewById(R.id.angle);
-            mTextView.setText(angle);
-//            bar.setProgress(newProgress);
-            return true;
+//    public boolean updateListView(int position, String angle) {
+//        int first = listview.getFirstVisiblePosition();
+//        int last = listview.getLastVisiblePosition();
+//        if(position < first || position > last) {
+//            //just update your DataSet
+//            //the next time getView is called
+//            //the ui is updated automatically
+//            return false;
+//        }
+//        else {
+//            View convertView = listview.getChildAt(position - first);
+//            //this is the convertView that you previously returned in getView
+//            //just fix it (for example:)
+////            seakBar bar = (SeakBar) convertView.findViewById(R.id.progress);
+//            TextView mTextView = (TextView) convertView.findViewById(R.id.angle);
+//            mTextView.setText(angle);
+////            bar.setProgress(newProgress);
+//            return true;
+//        }
+//    }
+
+    public void updateSensorDataOnUI(String deviceName, String angle){
+        switch (deviceName){
+            case SENSOR1:
+
         }
     }
-
 
     //math functions:
     //use vector angel method. a.b=\a\*\b\*cos(angle(a,b)) to calculate angle.
