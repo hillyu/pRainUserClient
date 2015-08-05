@@ -411,7 +411,7 @@ public class pMonService extends Service {
                                          int status) {
 
             handleSensorData(gatt, characteristic);
-            Log.d(TAG, characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0).toString());
+//            Log.d(TAG, characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0).toString());
             //request after delay fro another read:
             Runnable timeout = new Runnable() {
                 @Override
