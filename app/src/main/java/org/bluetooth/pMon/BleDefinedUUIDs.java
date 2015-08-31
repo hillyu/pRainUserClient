@@ -8,6 +8,7 @@ public class BleDefinedUUIDs {
 		final static public UUID HEART_RATE               = UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb");
         final static public UUID PMON_SERVICES            = UUID.fromString("0000ffa0-0000-1000-8000-00805f9b34fb");
 		final static public UUID DEVICE_INFO			  = UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb");
+		final static public UUID NRF_SERVICE			  = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
     };
 	
 	public static class Characteristic {
@@ -21,6 +22,8 @@ public class BleDefinedUUIDs {
         final static public UUID PMON_BMP     = UUID.fromString("0000ffb7-0000-1000-8000-00805f9b34fb");
 
 		final static public UUID BATTERY_LEVEL            = UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
+		final static public UUID NRF_MPU_NOTIFY			  = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
+
 	}
 	
 	public static class Descriptor {

@@ -251,7 +251,7 @@ public class PmonActivity extends Activity {
             initialVec.put(deviceAddress, vec);
             currentVec.put(deviceAddress, vec);
         }
-        if (characteristic.equals(BleDefinedUUIDs.Characteristic.PMON_MPU6050.toString())) {
+        if (characteristic.equals(BleDefinedUUIDs.Characteristic.PMON_MPU6050.toString()) || characteristic.equals(BleDefinedUUIDs.Characteristic.NRF_MPU_NOTIFY.toString())) {
 
             if (data != null && data.length > 0) {
 //                final StringBuilder stringBuilder = new StringBuilder(data.length);

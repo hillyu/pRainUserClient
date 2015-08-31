@@ -53,6 +53,9 @@ public class pMonService extends Service {
     final static private UUID pMon_MPU6050_Characteristic = BleDefinedUUIDs.Characteristic.PMON_MPU6050;
     final static private UUID pMon_BMP_Characteristic = BleDefinedUUIDs.Characteristic.PMON_BMP;
     final static private UUID pMon_BAT_Characteristic = BleDefinedUUIDs.Characteristic.BATTERY_LEVEL;
+    final static private UUID nrf_service = BleDefinedUUIDs.Service.NRF_SERVICE;
+    final static private UUID nrf_mpu_notify_Characteristic = BleDefinedUUIDs.Characteristic.NRF_MPU_NOTIFY;
+    final static private UUID nrf_CCCD = BleDefinedUUIDs.Descriptor.CHAR_CLIENT_CONFIG;
     //String Constant
     public static final String EXTRAS_DEVICE_NAME = PeripheralActivity.EXTRAS_DEVICE_NAME;
     public static final String EXTRAS_DEVICE_ADDRESS = PeripheralActivity.EXTRAS_DEVICE_ADDRESS;
@@ -355,39 +358,48 @@ public class pMonService extends Service {
                 //let the client know via action broadcast;
                 broadcastUpdate(gatt, ACTION_GATT_SERVICES_DISCOVERED);
                 BluetoothGattService tmpService = gatt.getService(pMon_Services);
-                final BluetoothGattCharacteristic mpu6050 = tmpService.getCharacteristic(pMon_MPU6050_Characteristic);
-                final BluetoothGattCharacteristic bmp = tmpService.getCharacteristic(pMon_BMP_Characteristic);
+                if(tmpService != null) {
+                    final BluetoothGattCharacteristic mpu6050 = tmpService.getCharacteristic(pMon_MPU6050_Characteristic);
+                    final BluetoothGattCharacteristic bmp = tmpService.getCharacteristic(pMon_BMP_Characteristic);
+                    Runnable mpuTO = new Runnable() {
+                        @Override
+                        public void run() {
+                            gatt.readCharacteristic(mpu6050);
+                        }
+                    };
+                    Runnable bmpTO = new Runnable() {
+                        @Override
+                        public void run() {
+                            gatt.readCharacteristic(bmp);
+                        }
+                    };
+                    mHandler.postDelayed(mpuTO, 2000);
+                    //                mHandler.postDelayed(bmpTO, 3000); //0.5 seconds //Fixme: Disabled BMP for now.
+
+                }
                 //battery service and characteristic
                 BluetoothGattService battService = gatt.getService(dev_info);
-                final BluetoothGattCharacteristic battlevel = battService.getCharacteristic(pMon_BAT_Characteristic);
-                
+                if(battService != null) {
+                    final BluetoothGattCharacteristic battlevel = battService.getCharacteristic(pMon_BAT_Characteristic);
+                    Runnable batTO = new Runnable() {
+                        @Override
+                        public void run() {
+                            gatt.readCharacteristic(battlevel);
+                        }
+                    };
 
-
-                Runnable mpuTO = new Runnable() {
-                    @Override
-                    public void run() {
-                        gatt.readCharacteristic(mpu6050);
-                    }
-                };
-
-                Runnable bmpTO = new Runnable() {
-                    @Override
-                    public void run() {
-                        gatt.readCharacteristic(bmp);
-                    }
-                };
-
-                Runnable batTO = new Runnable() {
-                    @Override
-                    public void run() {
-                        gatt.readCharacteristic(battlevel);
-                    }
-                };
-                mHandler.postDelayed(batTO, 1000); //0.5 seconds
-                mHandler.postDelayed(mpuTO, 2000);
-//                mHandler.postDelayed(bmpTO, 3000); //0.5 seconds //Fixme: Disabled BMP for now.
-
-
+                    mHandler.postDelayed(batTO, 1000); //0.5 seconds
+                }
+                //TODO: turn on notify on nrf51 board, since it supports notification.
+                BluetoothGattService mNRFService = gatt.getService(nrf_service);
+                if (mNRFService != null) {
+                    final BluetoothGattCharacteristic mNRF_MPU_NOTIFY_Characteristic = mNRFService.getCharacteristic(nrf_mpu_notify_Characteristic);
+                    gatt.setCharacteristicNotification(mNRF_MPU_NOTIFY_Characteristic, true);
+                    //standard descriptor setting. needed as documentation specified.
+                    BluetoothGattDescriptor descriptor = mNRF_MPU_NOTIFY_Characteristic.getDescriptor(nrf_CCCD);
+                    descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                    gatt.writeDescriptor(descriptor);
+                }
             } else {
                 Log.d(TAG, "Unable to discover services");
             }
@@ -398,8 +410,14 @@ public class pMonService extends Service {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
+
             if (characteristic.equals(mBTValueCharacteristic)) {
 //            getAndDisplayHrValue();
+            }
+            if (characteristic.getUuid().equals(nrf_mpu_notify_Characteristic)){
+//                Log.d (TAG, characteristic.getUuid().toString());
+                handleSensorData(gatt, characteristic);
+                Log.d(TAG, characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0).toString());
             }
         }
 
