@@ -1,27 +1,24 @@
-package org.bluetooth.pMon;
+package org.bluetooth.pRain;
 
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
-import android.app.ListActivity;
+import android.app.AlertDialog;
+import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
@@ -35,25 +32,25 @@ import android.util.JsonReader;
 import android.util.JsonToken;
 import android.util.JsonWriter;
 import android.util.Log;
-import android.view.MenuItem;
-import android.view.View;
-import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.support.v4.app.NavUtils;
+import android.widget.Toast;
 
 /* this activity's purpose is to show how to use particular type of devices in easy and fast way */
 public class PmonActivity extends Activity {
 
     private static final String TAG = "PmonActivity";
+    private static final int MAX_PROGRESS_ANGLE = 20;
+    private static final short CANCEL_CONN_TO = 8000;
     private Handler mHandler = null;
     private Map<String, double[]> initialVec = new HashMap<String, double[]>(); //intial
     private Map<String, double[]> currentVec = new HashMap<String, double[]>(); //keep track of latest update.
     private Map<String, double[]> previousVec = new HashMap<String, double[]>();
+
+    private BleWrapper mBleWrapper = null;
+    private static final int ENABLE_BT_REQUEST_ID = 1;
 
     //
 //    public static final String EXTRAS_DEVICE_NAME = PeripheralActivity.EXTRAS_DEVICE_NAME;
@@ -71,19 +68,49 @@ public class PmonActivity extends Activity {
     private TextView status2;
     private TextView status3;
     private ProgressBar progress1, progress2, progress3;
+    private boolean s1Online =false;
+    private boolean s2Online=false;
+    private boolean s3Online=false;
+    private boolean s1Found=false;
+    private boolean s2Found=false;
+    private boolean s3Found=false;
 
-
+    private  AlertDialog alert11;
     private pMonService mPmonService;
     private pMonSensorItemAdapter mListAdapter;
-    private double sensitivity = 0.8f;
-    public static final String SENSOR1 = "pMon1";
-    public static final String SENSOR2 = "pMon2";
-    public static final String SENSOR3 = "pMon3";
+    private double sensitivity = 1f;
+    public static final String SENSOR1 = "pRain1";
+    public static final String SENSOR2 = "pRain2";
+    public static final String SENSOR3 = "pRain3";
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // BLE related stuff:
+        // create BleWrapper with empty callback object except uiDeficeFound function (we need only that here)
+        mBleWrapper = new BleWrapper(this, new BleWrapperUiCallbacks.Null() {
+            @Override
+            public void uiDeviceFound(final BluetoothDevice device, final int rssi, final byte[] record) {
+                handleFoundDevice(device, rssi, record);
+            }
+        });
+
+        // check if we have BT and BLE on board
+        if (mBleWrapper.checkBleHardwareAvailable() == false) {
+            bleMissing();
+
+        }
+        mBleWrapper.initialize();
+        mBleWrapper.startScanning();
+//        mHandler.postDelayed(new Runnable() {
+//            @Override
+//            public void run() {
+//                if (mBleWrapper == null) return;
+//
+//                mBleWrapper.stopScanning();
+//            }
+//        }, 2000);
         setContentView(R.layout.activity_pmon);
 //        listview = (ListView) findViewById(R.id.listView);
 //        mListAdapter = new pMonSensorItemAdapter(this);
@@ -102,14 +129,18 @@ public class PmonActivity extends Activity {
         progress1 = (ProgressBar) findViewById(R.id.progressBar1);
         progress2 = (ProgressBar) findViewById(R.id.progressBar2);
         progress3 = (ProgressBar) findViewById(R.id.progressBar3);
-
+// load settings file from the storage, break if not exists.
         try {
             readSettings();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        //TODO: Check availability of sensors based on device address from readings.
 
-        Button adjustButton = (Button) findViewById(R.id.button);
+        showConnectingDialog();
+
+
+//        Button adjustButton = (Button) findViewById(R.id.button);
 
         // Get device info from scanActivity.
 //        Intent intent = getIntent();
@@ -123,15 +154,16 @@ public class PmonActivity extends Activity {
 //        for (int j = 0; j < mDeviceAddrs.size(); j++) {
 //            mBTPeripherals.put(mDeviceAddrs.get(j), mDeviceName.get(j));
 //        }
-        Intent pMonServiceIntent = new Intent(this, pMonService.class);
-        bindService(pMonServiceIntent, mServiceConnection, 0);
+        //Do not Need to bind agian.
+//        Intent pMonServiceIntent = new Intent(this, pMonService.class);
+//        bindService(pMonServiceIntent, mServiceConnection, 0);
 
 //        mConsole = (EditText) findViewById(R.id.hr_console_item);
         Log.d("MYLOG", "Creating activity");
 
         // Show the Up button in the action bar.
-        getActionBar().setDisplayHomeAsUpEnabled(true);
-        setTitle("pMon Multi-Sensor");
+//        getActionBar().setDisplayHomeAsUpEnabled(true);
+        setTitle(getString(R.string.main_title));
 //        mConsole = (EditText) findViewById(R.id.hr_console_item);
         mTextView = (TextView) findViewById(R.id.hr_text_view);
 
@@ -140,42 +172,80 @@ public class PmonActivity extends Activity {
 
         Log.d("MYLOG", "Activity created");
 
-        adjustButton.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
+//        adjustButton.setOnClickListener(new View.OnClickListener() {
+//            public void onClick(View v) {
+//
+//                for (final Map.Entry<String, double[]> entry : currentVec.entrySet()) {
+//                    initialVec.put(entry.getKey(), entry.getValue());
+//
+//                }
+//                mHandler.post(new Runnable() {
+//                    public void run() {
+//                        try {
+//                            writeSettings(initialVec);
+//                        } catch (IOException e) {
+//                            e.printStackTrace();
+//                        }
+//                    }
+//                });
+//            }
+//
+//
+//        });
 
-                for (final Map.Entry<String, double[]> entry : currentVec.entrySet()) {
-                    initialVec.put(entry.getKey(), entry.getValue());
-
-                }
-                mHandler.post(new Runnable() {
-                    public void run() {
-                        try {
-                            writeSettings(initialVec);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-            }
-
-
-        });
     }
+    private boolean alreadyFoundMe = false;
+    private boolean alreadyFoundAll = false;
+    private void handleFoundDevice(BluetoothDevice device, int rssi, byte[] record) {
+
+        //check if the sensor found matches the one loaded in settings
+        if (!alreadyFoundMe && !initialVec.containsKey(device.getAddress())){
+            AlertDialog.Builder builder1 = new AlertDialog.Builder(this);
+            builder1.setMessage("New sensors detected, if you have just replaced your old sensor, " +
+                    "please update your personal settings, the sensor will not be usable until you have done so. Otherwise just ignore this message.");//Fixme: add to string res.
+            builder1.setCancelable(false);
+            builder1.setPositiveButton("OK, I understand.",null);
 
 
-
-
-
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                NavUtils.navigateUpFromSameTask(this);
-                return true;
+            AlertDialog alert11 = builder1.create();
+            alert11.show();
+            alreadyFoundMe = true;
         }
-        return super.onOptionsItemSelected(item);
+
+        switch(device.getName()){
+            case SENSOR1:
+                s1Found = true;
+                break;
+            case SENSOR2:
+                s2Found = true;
+                break;
+            case SENSOR3:
+                s3Found = true;
+                break;
+            default: break;
+        }
+       if (s1Found && s2Found && s3Found ) if (!alreadyFoundAll) {
+
+           if(mBleWrapper != null){
+           mBleWrapper.stopScanning();
+           mBleWrapper.close();
+           mBleWrapper = null;
+           }
+           startPmonService();
+
+       }
     }
+
+
+//    @Override
+//    public boolean onOptionsItemSelected(MenuItem item) {
+//        switch (item.getItemId()) {
+//            case android.R.id.home:
+//                NavUtils.navigateUpFromSameTask(this);
+//                return true;
+//        }
+//        return super.onOptionsItemSelected(item);
+//    }
 
     @Override
     protected void onResume() {
@@ -201,9 +271,22 @@ public class PmonActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unbindService(mServiceConnection);
+//        unbindService(mServiceConnection);
+        Intent pMonServiceIntent = new Intent(this, pMonService.class);
+        stopService(pMonServiceIntent);
     }
-
+    /* check if user agreed to enable BT */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // user didn't want to turn on BT
+        if (requestCode == ENABLE_BT_REQUEST_ID) {
+            if (resultCode == Activity.RESULT_CANCELED) {
+                btDisabled();
+                return;
+            }
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
     // Code to manage Service lifecycle.
     private final ServiceConnection mServiceConnection = new ServiceConnection() {
 
@@ -242,6 +325,64 @@ public class PmonActivity extends Activity {
 //			}
 //    	});
 //	}
+
+    //start the pMonService
+    private void startPmonService() {
+
+
+        ArrayList<String> tmpDeviceNames = new ArrayList<>();
+        ArrayList<String> tmpDeviceAddrs = new ArrayList<>();
+
+        Intent pMonServiceIntent = new Intent(this, pMonService.class);
+
+        for (final Map.Entry<String, double[]> entry : initialVec.entrySet()) {
+
+                tmpDeviceAddrs.add(entry.getKey());
+                tmpDeviceNames.add("Default Device"); //Fixme: Consider Remove this later
+
+        }
+
+        if (!tmpDeviceAddrs.isEmpty()) {
+
+            //pass it along to our background service: pMonService
+
+            pMonServiceIntent.putStringArrayListExtra(PeripheralActivity.EXTRAS_DEVICE_NAME, tmpDeviceNames);
+            pMonServiceIntent.putStringArrayListExtra(PeripheralActivity.EXTRAS_DEVICE_ADDRESS, tmpDeviceAddrs);
+
+            startService(pMonServiceIntent);
+
+        } else {
+            AlertDialog.Builder builder1 = new AlertDialog.Builder(this);
+            builder1.setMessage("Device Address Empty! Your personal setting is incorrect, please contact us!");//Fixme: add to string res.
+            builder1.setCancelable(true);
+            builder1.setPositiveButton("OK, I understand!",
+                    new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            dialog.cancel();
+                        }
+                    });
+
+
+            AlertDialog alert11 = builder1.create();
+            alert11.show();
+        }
+//        startActivity(new Intent(this, PmonActivity.class));
+    }
+
+
+    //system related bt initialization functions.
+
+
+    private void btDisabled() {
+        Toast.makeText(this, "Sorry, BT has to be turned ON for us to work!", Toast.LENGTH_LONG).show();
+        finish();
+    }
+
+    private void bleMissing() {
+        Toast.makeText(this, "BLE Hardware is required but not available!", Toast.LENGTH_LONG).show();
+        finish();
+    }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //data processing:
 
     private void processData(String deviceName, String deviceAddress, String characteristic, byte[] data) {
@@ -325,8 +466,9 @@ public class PmonActivity extends Activity {
         }
     }
 
+
     // Handles various events fired by the Service that has been bound to.
-    private final BroadcastReceiver mPmonReceiver = new BroadcastReceiver() {
+    protected final BroadcastReceiver mPmonReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             //TODO: do something for data recieved via intent's ACTIONs.
@@ -350,33 +492,51 @@ public class PmonActivity extends Activity {
                     switch (deviceName) {
                         case SENSOR1:
                             status1.setText(R.string.online);
+                            s1Online = true;
                             break;
                         case SENSOR2:
                             status2.setText(R.string.online);
+                            s2Online =true;
                             break;
                         case SENSOR3:
                             status3.setText(R.string.online);
+                            s3Online =true;
                             break;
                         default:
                             break;
 
 
                     }
-                    //TODO: set connection status in UI
+//                    if (status1.getText().equals(R.string.online) && status2.getText().equals(R.string.online) && status3.getText().equals(R.string.online)){
+                    if (s1Online && s2Online && s3Online ){
+                        //use a timer to delay dialog cancelation as at beginning of connecting to new sensor data is not pulled yet.
+                        // doing this makes the app feel more resonsive.
+                        mHandler.postDelayed(new Runnable() {
+                            public void run() {
+                                cancelConnectingDialog();
+                            }
+                        },CANCEL_CONN_TO);
+
+
+                    }
                     break;
                 case pMonService.ACTION_GATT_DISCONNECTED:
                     //TODO: set disconnected status in UI, also may trigger alert to user to reconnect.
                     deviceName = intent.getStringExtra(pMonService.EXTRAS_DEVICE_NAME);
                     deviceAddress = intent.getStringExtra(pMonService.EXTRAS_DEVICE_ADDRESS);
+                    showDisconnectinDetectedDialog();
                     switch (deviceName) {
                         case SENSOR1:
                             status1.setText(R.string.offline);
+                            s1Online = false;
                             break;
                         case SENSOR2:
                             status2.setText(R.string.offline);
+                            s2Online =false;
                             break;
                         case SENSOR3:
                             status3.setText(R.string.offline);
+                            s3Online =false;
                             break;
                         default:
                             break;
@@ -391,6 +551,38 @@ public class PmonActivity extends Activity {
 
         }
     };
+
+    private void cancelConnectingDialog() {
+        alert11.cancel();
+    }
+
+    private void showConnectingDialog() {
+        AlertDialog.Builder builder1 = new AlertDialog.Builder(this);
+        builder1.setMessage("Searching for sensors... \nMake sure all the sensors are switched on!");//Fixme: add to string res.
+        builder1.setCancelable(true);
+        builder1.setPositiveButton("Exit",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        finish();
+                    }
+                });
+        alert11 = builder1.create();
+        alert11.show();
+    }
+    private void showDisconnectinDetectedDialog() {
+        if (alert11.isShowing()) return;
+        AlertDialog.Builder builder1 = new AlertDialog.Builder(this);
+        builder1.setMessage("Device disconnection detected, try reconnecting...");//Fixme: add to string res.
+        builder1.setCancelable(true);
+        builder1.setPositiveButton("Exit",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        finish();
+                    }
+                });
+        alert11 = builder1.create();
+        alert11.show();
+    }
 
     private static IntentFilter mIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
@@ -438,7 +630,7 @@ public class PmonActivity extends Activity {
 
     public void updateSensorDataOnUI(String deviceName, double angle) {
         final String angleStr = String.format("%.0f", angle) + "°";
-        final int angleProgress = (int) angle * 100 / 30;
+        final int angleProgress = (int) angle * 100 / MAX_PROGRESS_ANGLE;
         switch (deviceName) {
             case SENSOR1:
                 mHandler.post(new Runnable() {
@@ -470,6 +662,7 @@ public class PmonActivity extends Activity {
 
         }
     }
+    //Fixme: this shoould be on a single thead.
 
     //math functions:
     //use vector angel method. a.b=\a\*\b\*cos(angle(a,b)) to calculate angle.
@@ -535,7 +728,24 @@ public class PmonActivity extends Activity {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        if (fis == null){return;}
+        if (fis == null){   // Alert user to contact us for his settigns profile.
+
+                AlertDialog.Builder builder1 = new AlertDialog.Builder(this);
+            builder1.setMessage("No posture setting found on your device, please contact us to load the settings for you!");//Fixme: add to string res.
+                builder1.setCancelable(false);
+                builder1.setPositiveButton("OK, I understand!",
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                                System.exit(0);
+                            }
+                        });
+
+
+                AlertDialog alert11 = builder1.create();
+                alert11.show();
+
+
+            return;}
         JsonReader reader = new JsonReader(new InputStreamReader(fis, "UTF-8"));
         try {
             readMessageArray(reader);
@@ -595,7 +805,12 @@ public class PmonActivity extends Activity {
         Date now = new Date();
         String dateStr = "Settings Uploaded on: " + formatter.format(now);
         File file = new File(getStorageDir("postureData"), "settings.txt"); //use hardcode settings.txt as setting file.
-        FileOutputStream fos = new FileOutputStream(file);
+        FileOutputStream fos = new FileOutputStream(file,false);
+        //clear its content
+        fos.close();
+
+        fos = new FileOutputStream(file);
+
         final FileOutputStream finalFos = fos;
         JsonWriter writer = null;
         writer = new JsonWriter(new OutputStreamWriter(finalFos, "UTF-8"));

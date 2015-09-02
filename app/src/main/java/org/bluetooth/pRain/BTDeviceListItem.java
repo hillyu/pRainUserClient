@@ -1,4 +1,4 @@
-package org.bluetooth.pMon;
+package org.bluetooth.pRain;
 
 import android.bluetooth.BluetoothDevice;
 

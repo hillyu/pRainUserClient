@@ -1,4 +1,4 @@
-package org.bluetooth.pMon;
+package org.bluetooth.pRain;
 
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
@@ -33,7 +33,7 @@ import java.util.UUID;
 public class pMonService extends Service {
     private static final String TAG = "pMonService"; //degug tag;
     private static final int DATA_RATE_TIMEOUT = 200;
-    private static final short BATTERY_QUERY_TIMEOUT = 3000;
+    private static final int BATTERY_QUERY_TIMEOUT = 60000;
 
     private Handler mHandler = null;
     private final IBinder mBinder = new LocalBinder();
@@ -115,6 +115,19 @@ public class pMonService extends Service {
             return pMonService.this;
         }
     }
+    @Override
+    public boolean onUnbind(Intent intent) {
+        // After using a given device, you should make sure that BluetoothGatt.close() is called
+        // such that resources are cleaned up properly.  In this particular example, close() is
+        // invoked when the UI is disconnected from the Service.
+        closeGatt();
+        return super.onUnbind(intent);
+    }
+    @Override
+    public void onDestroy() {
+        closeGatt();
+
+    }
 
     /**
      * Initializes the service .
@@ -124,21 +137,23 @@ public class pMonService extends Service {
     public boolean initialize() {
         // For API level 18 and above, get a reference to BluetoothAdapter through
         // BluetoothManager.
+        if (!isInitialized)
+        {
+            // first check if BT/BLE is available and enabled
+            if (initBt() == false) return false;
+            if (isBleAvailable() == false) return false;
+            if (isBtEnabled() == false) return false;
 
-        // first check if BT/BLE is available and enabled
-        if (initBt() == false) return false;
-        if (isBleAvailable() == false) return false;
-        if (isBtEnabled() == false) return false;
+            // then connect to the device indicated in the Intent received;
+            for (Map.Entry<String, String> entry : mBTPeripherals.entrySet()) {
 
-        // then connect to the device indicated in the Intent received;
-        for (Map.Entry<String, String> entry : mBTPeripherals.entrySet()) {
-
-            String address = entry.getKey();
-            BluetoothDevice device = mBTAdapter.getRemoteDevice(address);
-            connectToDevice(device);
+                String address = entry.getKey();
+                BluetoothDevice device = mBTAdapter.getRemoteDevice(address);
+                connectToDevice(device);
 //            Log.d(TAG, "Device: " + entry.getValue() + " connected!");
+            }
+            isInitialized = true; //set the status of service so the client would know if initialization
         }
-        isInitialized = true; //set the status of service so the client would know if initialization
         // is needed
         return true;
     }
@@ -277,28 +292,39 @@ public class pMonService extends Service {
 
         sendBroadcast(intent);
 
-        //create Thread to write data to storage.
-        Runnable writeRawDataToStorage = new Runnable() {
-            @Override
-            public void run() {
-                if (isExternalStorageWritable()) {
-                    SimpleDateFormat formatter = new SimpleDateFormat("yyyy_MM_dd");
-                    Date now = new Date();
-                    String filename = formatter.format(now) + "_" + characteristicName +".raw";
+//        //create Thread to write data to storage.
+//        Runnable writeRawDataToStorage = new Runnable() {
+//            @Override
+//            public void run() {
 
-                    File file = new File(getStorageDir("postureData"), filename); //initialize file with storageDir using the filename defined in filename variable
 
-                    // get current timestamp
-                    Long tsLong = System.currentTimeMillis();
-                    try {
-                        FileOutputStream fos = new FileOutputStream(file, true);
+//            }
+//        };
+        if(!characteristic.getUuid().equals(pMon_BAT_Characteristic)) //do not write batt info.
+//        mHandler.post(writeRawDataToStorage);
+        writeRawDataToStorage(characteristicName,address,characteristic.getValue());
+
+    }
+
+    private void writeRawDataToStorage(String characteristicName, String deviceAddress, byte [] value) {
+        if (isExternalStorageWritable()) {
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyy_MM_dd");
+            Date now = new Date();
+            String filename = formatter.format(now) + "_" + characteristicName +".raw";
+
+            File file = new File(getStorageDir("postureData"), filename); //initialize file with storageDir using the filename defined in filename variable
+
+            // get current timestamp
+            Long tsLong = System.currentTimeMillis();
+            try {
+                FileOutputStream fos = new FileOutputStream(file, true);
  /*
        * To create DataOutputStream object from FileOutputStream use,
        * DataOutputStream(OutputStream os) constructor.
        *
        */
 
-                        DataOutputStream dos = new DataOutputStream(fos);
+                DataOutputStream dos = new DataOutputStream(fos);
                     /*
         * To write an int value to a file, use
         * void writeInt(int i) method of Java DataOutputStream class.
@@ -306,13 +332,13 @@ public class pMonService extends Service {
         * This method writes specified int to output stream as 4 bytes value.
         */
 
-                        dos.write(0xAA);//header
-                        dos.writeLong(tsLong);
-                        dos.write(characteristic.getValue());
-                        dos.writeBytes(address);
+                dos.write(0xAA);//header
+                dos.writeLong(tsLong);
+                dos.write(value);
+                dos.writeBytes(deviceAddress);
 //                        dos.write(bmpraw);
 //                    dos.writeShort(event);
-                        dos.write(0x0a);//tail total 32
+                dos.write(0x0a);//tail total 32
 
 
         /*
@@ -321,19 +347,14 @@ public class pMonService extends Service {
          *
          */
 
-                        dos.close();
+                dos.close();
 
-                        fos.close();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-
-                }
-
+                fos.close();
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        };
-        mHandler.post(writeRawDataToStorage);
 
+        }
     }
 
     /* Bluetooth GAtt call back funcition override */
@@ -388,7 +409,7 @@ public class pMonService extends Service {
                         }
                     };
 
-                    mHandler.postDelayed(batTO, 1000); //0.5 seconds
+                    mHandler.postDelayed(batTO, 10000); //0.5 seconds
                 }
                 //TODO: turn on notify on nrf51 board, since it supports notification.
                 BluetoothGattService mNRFService = gatt.getService(nrf_service);
@@ -417,7 +438,7 @@ public class pMonService extends Service {
             if (characteristic.getUuid().equals(nrf_mpu_notify_Characteristic)){
 //                Log.d (TAG, characteristic.getUuid().toString());
                 handleSensorData(gatt, characteristic);
-                Log.d(TAG, characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0).toString());
+//                Log.d(TAG, characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8,0).toString());
             }
         }
 

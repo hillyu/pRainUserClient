@@ -1,4 +1,4 @@
-package org.bluetooth.pMon;
+package org.bluetooth.pRain;
 
 import android.app.AlertDialog;
 import android.content.ComponentName;
@@ -12,7 +12,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.os.IBinder;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
