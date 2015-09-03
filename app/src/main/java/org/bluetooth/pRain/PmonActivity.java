@@ -87,6 +87,7 @@ public class PmonActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mHandler = new Handler();
         // BLE related stuff:
         // create BleWrapper with empty callback object except uiDeficeFound function (we need only that here)
         mBleWrapper = new BleWrapper(this, new BleWrapperUiCallbacks.Null() {
@@ -138,7 +139,15 @@ public class PmonActivity extends Activity {
         //TODO: Check availability of sensors based on device address from readings.
 
         showConnectingDialog();
-
+//set a time out for connecting, when on timeout, show failtoconnect dialog.
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (alert11.isShowing()){
+                cancelConnectingDialog();
+                showFailedToConnectDialog();}
+            }
+        },30000);
 
 //        Button adjustButton = (Button) findViewById(R.id.button);
 
@@ -167,7 +176,7 @@ public class PmonActivity extends Activity {
 //        mConsole = (EditText) findViewById(R.id.hr_console_item);
         mTextView = (TextView) findViewById(R.id.hr_text_view);
 
-        mHandler = new Handler();
+
 
 
         Log.d("MYLOG", "Activity created");
@@ -194,6 +203,19 @@ public class PmonActivity extends Activity {
 //        });
 
     }
+
+    private void showFailedToConnectDialog() {
+        AlertDialog.Builder builder1 = new AlertDialog.Builder(this);
+        builder1.setMessage("Failed to connect some of the sensors, please make sure all the sensors are switched on, and check the battery of the faulty sensor!");//Fixme: add to string res.
+        builder1.setCancelable(false);
+        builder1.setPositiveButton("OK, I understand.", null);
+
+
+        AlertDialog alert11 = builder1.create();
+        alert11.show();
+        alreadyFoundMe = true;
+    }
+
     private boolean alreadyFoundMe = false;
     private boolean alreadyFoundAll = false;
     private void handleFoundDevice(BluetoothDevice device, int rssi, byte[] record) {
@@ -204,7 +226,7 @@ public class PmonActivity extends Activity {
             builder1.setMessage("New sensors detected, if you have just replaced your old sensor, " +
                     "please update your personal settings, the sensor will not be usable until you have done so. Otherwise just ignore this message.");//Fixme: add to string res.
             builder1.setCancelable(false);
-            builder1.setPositiveButton("OK, I understand.",null);
+            builder1.setPositiveButton("OK, I understand.", null);
 
 
             AlertDialog alert11 = builder1.create();
@@ -558,9 +580,9 @@ public class PmonActivity extends Activity {
 
     private void showConnectingDialog() {
         AlertDialog.Builder builder1 = new AlertDialog.Builder(this);
-        builder1.setMessage("Searching for sensors... \nMake sure all the sensors are switched on!");//Fixme: add to string res.
+        builder1.setMessage("Searching for sensors... \n\nMake sure all the sensors are switched on!");//Fixme: add to string res.
         builder1.setCancelable(true);
-        builder1.setPositiveButton("Exit",
+        builder1.setPositiveButton("Cancel",
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
                         finish();
