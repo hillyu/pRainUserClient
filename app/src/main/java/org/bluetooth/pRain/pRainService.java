@@ -30,8 +30,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
-public class pMonService extends Service {
-    private static final String TAG = "pMonService"; //degug tag;
+public class pRainService extends Service {
+    private static final String TAG = "pRainService"; //degug tag;
     private static final int DATA_RATE_TIMEOUT = 200;
     private static final int BATTERY_QUERY_TIMEOUT = 60000;
 
@@ -74,7 +74,7 @@ public class pMonService extends Service {
             "org.bluetooth.pMon.ACTION_GATT_SERVICES_DISCOVERED";
 
 
-    public pMonService() {
+    public pRainService() {
         mHandler = new Handler();
     }
 
@@ -111,8 +111,8 @@ public class pMonService extends Service {
     }
 
     public class LocalBinder extends Binder {
-        pMonService getService() {
-            return pMonService.this;
+        pRainService getService() {
+            return pRainService.this;
         }
     }
     @Override

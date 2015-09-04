@@ -76,7 +76,7 @@ public class PmonActivity extends Activity {
     private boolean s3Found=false;
 
     private  AlertDialog alert11;
-    private pMonService mPmonService;
+    private pRainService mPmonService;
     private pMonSensorItemAdapter mListAdapter;
     private double sensitivity = 1f;
     public static final String SENSOR1 = "pRain1";
@@ -147,7 +147,7 @@ public class PmonActivity extends Activity {
                 cancelConnectingDialog();
                 showFailedToConnectDialog();}
             }
-        },30000);
+        },120000);
 
 //        Button adjustButton = (Button) findViewById(R.id.button);
 
@@ -164,7 +164,7 @@ public class PmonActivity extends Activity {
 //            mBTPeripherals.put(mDeviceAddrs.get(j), mDeviceName.get(j));
 //        }
         //Do not Need to bind agian.
-//        Intent pMonServiceIntent = new Intent(this, pMonService.class);
+//        Intent pMonServiceIntent = new Intent(this, pRainService.class);
 //        bindService(pMonServiceIntent, mServiceConnection, 0);
 
 //        mConsole = (EditText) findViewById(R.id.hr_console_item);
@@ -253,7 +253,13 @@ public class PmonActivity extends Activity {
            mBleWrapper.close();
            mBleWrapper = null;
            }
-           startPmonService();
+           mHandler.postDelayed(new Runnable() {
+               @Override
+               public void run() {
+                   startPmonService();
+               }
+           },5000);
+
 
        }
     }
@@ -294,7 +300,7 @@ public class PmonActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
 //        unbindService(mServiceConnection);
-        Intent pMonServiceIntent = new Intent(this, pMonService.class);
+        Intent pMonServiceIntent = new Intent(this, pRainService.class);
         stopService(pMonServiceIntent);
     }
     /* check if user agreed to enable BT */
@@ -315,12 +321,12 @@ public class PmonActivity extends Activity {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder service) {
 
-            mPmonService = ((pMonService.LocalBinder) service).getService();
+            mPmonService = ((pRainService.LocalBinder) service).getService();
             //Check if it is the service is already running if not initialize it.
             if (!mPmonService.isInitialized()) {
                 Log.e(TAG, "unInitialized Service connected, this is wrong!");
 //                if (!mPmonService.initialize()) {
-//                    Log.e(TAG, "Unable to initialize pMonService");
+//                    Log.e(TAG, "Unable to initialize pRainService");
 //                    finish();
 //                }
             }
@@ -348,14 +354,14 @@ public class PmonActivity extends Activity {
 //    	});
 //	}
 
-    //start the pMonService
+    //start the pRainService
     private void startPmonService() {
 
 
         ArrayList<String> tmpDeviceNames = new ArrayList<>();
         ArrayList<String> tmpDeviceAddrs = new ArrayList<>();
 
-        Intent pMonServiceIntent = new Intent(this, pMonService.class);
+        Intent pMonServiceIntent = new Intent(this, pRainService.class);
 
         for (final Map.Entry<String, double[]> entry : initialVec.entrySet()) {
 
@@ -366,7 +372,7 @@ public class PmonActivity extends Activity {
 
         if (!tmpDeviceAddrs.isEmpty()) {
 
-            //pass it along to our background service: pMonService
+            //pass it along to our background service: pRainService
 
             pMonServiceIntent.putStringArrayListExtra(PeripheralActivity.EXTRAS_DEVICE_NAME, tmpDeviceNames);
             pMonServiceIntent.putStringArrayListExtra(PeripheralActivity.EXTRAS_DEVICE_ADDRESS, tmpDeviceAddrs);
@@ -500,17 +506,17 @@ public class PmonActivity extends Activity {
             String characteristic;
             byte[] data;
             switch (action) {
-                case pMonService.ACTION_DATA_AVAILABLE:
-                    deviceName = intent.getStringExtra(pMonService.EXTRAS_DEVICE_NAME);
-                    deviceAddress = intent.getStringExtra(pMonService.EXTRAS_DEVICE_ADDRESS);
-                    characteristic = intent.getStringExtra(pMonService.EXTRA_CHARACTERISTIC);
-                    data = intent.getByteArrayExtra(pMonService.EXTRAS_DATA);
+                case pRainService.ACTION_DATA_AVAILABLE:
+                    deviceName = intent.getStringExtra(pRainService.EXTRAS_DEVICE_NAME);
+                    deviceAddress = intent.getStringExtra(pRainService.EXTRAS_DEVICE_ADDRESS);
+                    characteristic = intent.getStringExtra(pRainService.EXTRA_CHARACTERISTIC);
+                    data = intent.getByteArrayExtra(pRainService.EXTRAS_DATA);
 
                     processData(deviceName, deviceAddress, characteristic, data);
                     break;
-                case pMonService.ACTION_GATT_CONNECTED:
-                    deviceName = intent.getStringExtra(pMonService.EXTRAS_DEVICE_NAME);
-                    deviceAddress = intent.getStringExtra(pMonService.EXTRAS_DEVICE_ADDRESS);
+                case pRainService.ACTION_GATT_CONNECTED:
+                    deviceName = intent.getStringExtra(pRainService.EXTRAS_DEVICE_NAME);
+                    deviceAddress = intent.getStringExtra(pRainService.EXTRAS_DEVICE_ADDRESS);
                     switch (deviceName) {
                         case SENSOR1:
                             status1.setText(R.string.online);
@@ -542,29 +548,32 @@ public class PmonActivity extends Activity {
 
                     }
                     break;
-                case pMonService.ACTION_GATT_DISCONNECTED:
+                case pRainService.ACTION_GATT_DISCONNECTED:
                     //TODO: set disconnected status in UI, also may trigger alert to user to reconnect.
-                    deviceName = intent.getStringExtra(pMonService.EXTRAS_DEVICE_NAME);
-                    deviceAddress = intent.getStringExtra(pMonService.EXTRAS_DEVICE_ADDRESS);
-                    showDisconnectinDetectedDialog();
-                    switch (deviceName) {
-                        case SENSOR1:
-                            status1.setText(R.string.offline);
-                            s1Online = false;
-                            break;
-                        case SENSOR2:
-                            status2.setText(R.string.offline);
-                            s2Online =false;
-                            break;
-                        case SENSOR3:
-                            status3.setText(R.string.offline);
-                            s3Online =false;
-                            break;
-                        default:
-                            break;
+                    deviceName = intent.getStringExtra(pRainService.EXTRAS_DEVICE_NAME);
+                    deviceAddress = intent.getStringExtra(pRainService.EXTRAS_DEVICE_ADDRESS);
+                    if (deviceName !=null && deviceAddress !=null) {
+
+                        showDisconnectinDetectedDialog();
+                        switch (deviceName) {
+                            case SENSOR1:
+                                status1.setText(R.string.offline);
+                                s1Online = false;
+                                break;
+                            case SENSOR2:
+                                status2.setText(R.string.offline);
+                                s2Online = false;
+                                break;
+                            case SENSOR3:
+                                status3.setText(R.string.offline);
+                                s3Online = false;
+                                break;
+                            default:
+                                break;
+                        }
                     }
                     break;
-                case pMonService.ACTION_GATT_SERVICES_DISCOVERED:
+                case pRainService.ACTION_GATT_SERVICES_DISCOVERED:
                     //not quite useful but include for forward compatibility
                     break;
                 default:
@@ -608,10 +617,10 @@ public class PmonActivity extends Activity {
 
     private static IntentFilter mIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(pMonService.ACTION_GATT_CONNECTED);
-        intentFilter.addAction(pMonService.ACTION_GATT_DISCONNECTED);
-        intentFilter.addAction(pMonService.ACTION_GATT_SERVICES_DISCOVERED);
-        intentFilter.addAction(pMonService.ACTION_DATA_AVAILABLE);
+        intentFilter.addAction(pRainService.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(pRainService.ACTION_GATT_DISCONNECTED);
+        intentFilter.addAction(pRainService.ACTION_GATT_SERVICES_DISCOVERED);
+        intentFilter.addAction(pRainService.ACTION_DATA_AVAILABLE);
         return intentFilter;
     }
 

@@ -30,7 +30,7 @@ public class ScanningActivity extends ListActivity {
     private DeviceListAdapter mDevicesListAdapter = null;
     private BleWrapper mBleWrapper = null;
 
-    private pMonService mPmonService;
+    private pRainService mPmonService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,9 +61,9 @@ public class ScanningActivity extends ListActivity {
             startActivityForResult(enableBtIntent, ENABLE_BT_REQUEST_ID);
             // see onActivityResult to check what is the status of our request
         }
-        //check if pMonService is runing by binding to it and check the working status with
+        //check if pRainService is runing by binding to it and check the working status with
         // isInitialized() method of the pmonservice
-        Intent intent = new Intent(this, pMonService.class);
+        Intent intent = new Intent(this, pRainService.class);
         bindService(intent, mServiceConnection, 0);
         // initialize BleWrapper object
         mBleWrapper.initialize();
@@ -150,7 +150,7 @@ public class ScanningActivity extends ListActivity {
         ArrayList<String> tmpDeviceNames = new ArrayList<>();
         ArrayList<String> tmpDeviceAddrs = new ArrayList<>();
 
-        Intent pMonServiceIntent = new Intent(this, pMonService.class);
+        Intent pMonServiceIntent = new Intent(this, pRainService.class);
 
         for (int j = 0; j < mDevicesListAdapter.getCount(); j++) {
             if (mDevicesListAdapter.getDevice(j).isSelected() && mDevicesListAdapter != null) {
@@ -160,7 +160,7 @@ public class ScanningActivity extends ListActivity {
         }
         if (!tmpDeviceAddrs.isEmpty()) {
 
-            //pass it along to our background service: pMonService
+            //pass it along to our background service: pRainService
 
             pMonServiceIntent.putStringArrayListExtra(PeripheralActivity.EXTRAS_DEVICE_NAME, tmpDeviceNames);
             pMonServiceIntent.putStringArrayListExtra(PeripheralActivity.EXTRAS_DEVICE_ADDRESS, tmpDeviceAddrs);
@@ -264,7 +264,7 @@ public class ScanningActivity extends ListActivity {
 
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder service) {
-            mPmonService = ((pMonService.LocalBinder) service).getService();
+            mPmonService = ((pRainService.LocalBinder) service).getService();
             if (mPmonService.isInitialized()) {
                 //directly start the pMonActivity.
                 startPmonActivity();

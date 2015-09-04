@@ -48,7 +48,7 @@
 
         </activity>
         <service
-            android:name="org.bluetooth.pRain.pMonService"
+            android:name=".pRainService"
             android:enabled="true"
           >
         </service>
